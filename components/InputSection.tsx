@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchNewsSitemap, fetchArticleContent } from '../services/scraperService';
-import { Loader2, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Link as LinkIcon, FileText, ImageIcon, FileCheck } from 'lucide-react';
 import { TVRow, SiteRow, AlternateInputType } from '../types';
 
 interface InputSectionProps {
@@ -23,124 +23,135 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // ✅ SAFE URL OPEN FUNCTION
-  const openSafeUrl = (url: string) => {
-    try {
-      const validUrl = new URL(url);
-      window.open(validUrl.toString(), "_blank", "noopener,noreferrer");
-    } catch {
-      alert("Invalid or unsafe URL");
-    }
-  };
-
-  // Fetch sitemap
   useEffect(() => {
     let isMounted = true;
-
     const loadData = async () => {
       if (siteRows.length === 0) setLoading(true);
-
+      
       const data = await fetchNewsSitemap();
-
       if (isMounted && data && data.length > 0) {
         setSiteRows(prev => {
           const existingByUrl = new Map((prev || []).map(r => [r.url, r]));
-
-          return data.slice(0, 40).map((item, idx) => {
+          const merged = data.slice(0, 40).map((item, idx) => {
             const existing = existingByUrl.get(item.url);
-
             return existing
-              ? { ...existing, id: idx + 1, title: item.title }
+              ? { ...existing, id: idx + 1, title: item.title, timestamp: item.publicationDate
+                  ? new Date(item.publicationDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : existing.timestamp }
               : {
                   id: idx + 1,
                   title: item.title,
                   url: item.url,
-                  timestamp: new Date().toLocaleTimeString(),
+                  timestamp: item.publicationDate
+                    ? new Date(item.publicationDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                   giveMeRec: '',
                   auditStatus: '' as const,
                   actionTaken: ''
                 };
           });
+          return merged;
         });
       }
-
       if (isMounted) setLoading(false);
     };
 
     loadData();
     const intervalId = setInterval(loadData, 30000);
-
     return () => {
       isMounted = false;
       clearInterval(intervalId);
     };
   }, []);
 
+  const handleAuditTV = (index: number) => {
+    onProcessCustom(`TV SCHEDULE AUDIT FOR ROW ${index+1}`, 'TV Schedule');
+  };
+
   const handleAuditSite = async (index: number) => {
     const row = siteRows[index];
-
     if (row && row.url) {
-      try {
-        const extractedContent = await fetchArticleContent(row.url);
-
-        const context = `TITLE: ${row.title}\nURL: ${row.url}\n\nCONTENT:\n${extractedContent.substring(0, 2000)}`;
-
-        onProcessCustom(context, `Site URL: ${row.title}`);
-      } catch (err) {
-        console.error("Scraping failed", err);
-        alert("Failed to fetch article content");
-      }
+      const extractedContent = await fetchArticleContent(row.url);
+      const context = `TITLE: ${row.title}\nURL: ${row.url}\n\nCONTENT:\n${extractedContent.substring(0, 2500)}`;
+      onProcessCustom(context, `Site URL: ${row.title}`);
+    } else {
+      onProcessCustom(`SITE URL AUDIT FOR ROW ${index+1}`, 'Site URLs');
     }
   };
 
+  const handleRecommendSite = (idx: number) => {
+    onAIRecommend(idx);
+  };
+
+  const handleAlternateProcess = () => {
+    if (!altInputValue.trim() && altInputType !== 'Image Upload' && altInputType !== 'PDF Upload') return;
+    onProcessCustom(altInputValue, `Input: ${altInputType}`);
+  };
+
   return (
-    <div className="p-6 text-white">
+    <div className="w-full h-full p-4 md:p-8 font-sans text-sm space-y-12 pb-32">
+      <div className="max-w-7xl mx-auto space-y-12">
 
-      <h2 className="text-xl font-bold mb-4">Site URLs</h2>
+        <section className="bg-slate-800/80 rounded-xl p-6 border border-slate-700 shadow-lg mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-white uppercase font-mono tracking-widest flex items-center gap-3">
+              Site URLs
+              {loading && <Loader2 className="animate-spin text-blue-500" size={16} />}
+            </h3>
+          </div>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <table className="w-full text-sm">
-          <tbody>
-            {siteRows.slice(0, 10).map((row, idx) => (
-              <tr key={row.url} className="border-b border-gray-700">
+          <div className="overflow-x-auto rounded-lg border border-slate-700">
+            <table className="w-full text-left border-collapse whitespace-nowrap text-slate-300">
+              <tbody>
+                {siteRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((row, localIdx) => {
+                  const globalIdx = (currentPage - 1) * itemsPerPage + localIdx;
+                  return (
+                    <tr key={row.url} className="bg-slate-800 hover:bg-slate-750 transition-colors group">
+                      
+                      <td className="border-b border-r border-slate-700 p-0 text-xs px-3">
 
-                <td className="p-2">{row.title}</td>
+                        {/* ✅ FIXED LINK (ONLY CHANGE) */}
+                        <button
+                          onClick={() => {
+                            try {
+                              const validUrl = new URL(row.url);
+                              window.open(validUrl.toString(), "_blank", "noopener,noreferrer");
+                            } catch {
+                              console.error("Invalid URL:", row.url);
+                            }
+                          }}
+                          className="text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1 group-hover:text-blue-200 truncate max-w-[200px]"
+                        >
+                          {(() => {
+                            try {
+                              return new URL(row.url).pathname;
+                            } catch {
+                              return "Invalid URL";
+                            }
+                          })()}
+                          <LinkIcon size={12} className="shrink-0"/>
+                        </button>
 
-                {/* ✅ FIXED URL COLUMN */}
-                <td className="p-2">
-                  <button
-                    onClick={() => openSafeUrl(row.url)}
-                    className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                  >
-                    Open <LinkIcon size={14} />
-                  </button>
-                </td>
+                      </td>
 
-                <td className="p-2">
-                  <button
-                    onClick={() => handleAuditSite(idx)}
-                    className="bg-green-600 px-3 py-1 rounded text-xs"
-                  >
-                    Audit
-                  </button>
-                </td>
+                      <td>
+                        <button onClick={() => handleAuditSite(globalIdx)}>Audit</button>
+                      </td>
 
-                <td className="p-2">
-                  <button
-                    onClick={() => onAIRecommend(idx)}
-                    className="bg-blue-600 px-3 py-1 rounded text-xs"
-                  >
-                    Recommend
-                  </button>
-                </td>
+                      <td>
+                        <button onClick={() => handleRecommendSite(globalIdx)}>Recommend</button>
+                      </td>
 
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+        </section>
+
+      </div>
     </div>
   );
 };
