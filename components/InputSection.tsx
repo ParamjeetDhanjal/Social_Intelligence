@@ -40,7 +40,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           const merged = data.slice(0, 40).map((item, idx) => {
             const existing = existingByUrl.get(item.url);
             return existing
-              ? { ...existing, title: item.title, timestamp: item.publicationDate
+              ? { ...existing, id: idx + 1, title: item.title, timestamp: item.publicationDate
                   ? new Date(item.publicationDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : existing.timestamp }
               : {
@@ -189,7 +189,7 @@ const InputSection: React.FC<InputSectionProps> = ({
                   siteRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((row, localIdx) => {
                     const globalIdx = (currentPage - 1) * itemsPerPage + localIdx;
                     return (
-                      <tr key={row.id} className="bg-slate-800 hover:bg-slate-750 transition-colors group">
+                      <tr key={row.url} className="bg-slate-800 hover:bg-slate-750 transition-colors group">
                         <td className="border-b border-r border-slate-700 bg-slate-900/50 text-center text-xs text-slate-500">{row.id}</td>
                         <td className="border-b border-r border-slate-700 p-0">
                           <input 

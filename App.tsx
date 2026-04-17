@@ -121,14 +121,15 @@ const App: React.FC = () => {
     const row = siteRows[idx];
     if (!row) return;
     
-    const loadingRows = [...siteRows];
-    loadingRows[idx].giveMeRec = "ANALYZING...";
-    loadingRows[idx].auditStatus = '';
-    setSiteRows(loadingRows);
+    // Mark as loading using functional updater to avoid stale closure
+    setSiteRows(prev => {
+      const r = [...prev];
+      r[idx] = { ...r[idx], giveMeRec: 'ANALYZING...', auditStatus: '' as any };
+      return r;
+    });
 
     try {
       const recResult = await getAIRecommendation(row.title, row.url);
-      const finalRows = [...siteRows];
       let auditSt: any = '';
       let cleanRec = recResult;
       const prefixes = ['[GO]', '[HOLD]', '[NO]'];
@@ -139,18 +140,23 @@ const App: React.FC = () => {
           break;
         }
       }
-      finalRows[idx].giveMeRec = cleanRec;
-      finalRows[idx].auditStatus = auditSt;
-      setSiteRows(finalRows);
+      // Functional updater — always operates on latest state
+      setSiteRows(prev => {
+        const r = [...prev];
+        r[idx] = { ...r[idx], giveMeRec: cleanRec, auditStatus: auditSt };
+        return r;
+      });
 
       if (navigateToOutput) {
         handleProcess(row.title + ": " + row.url, `Recommendation Trigger: ${row.title}`);
       }
     } catch (err) {
       console.error(err);
-      const errorRows = [...siteRows];
-      errorRows[idx].giveMeRec = "ERROR";
-      setSiteRows(errorRows);
+      setSiteRows(prev => {
+        const r = [...prev];
+        r[idx] = { ...r[idx], giveMeRec: 'ERROR' };
+        return r;
+      });
     }
   };
 
