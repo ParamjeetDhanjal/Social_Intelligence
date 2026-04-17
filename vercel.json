@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/ndtv/:path*",
+      "destination": "https://www.ndtvprofit.com/:path*"
+    }
+  ]
+}
